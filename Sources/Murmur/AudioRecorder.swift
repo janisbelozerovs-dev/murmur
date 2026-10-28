@@ -285,8 +285,12 @@ final class AudioRecorder {
         let url = currentFileURL ?? FileManager.default.temporaryDirectory.appendingPathComponent("murmur-\(UUID().uuidString).caf")
         // A Bluetooth headset in call mode: tap at the rate it really delivers (24 kHz for AirPods) — the engine's own
         // idea of the format can still be the 48 kHz of music mode, and starting with that fails (-10868).
+        // The same after `chooseMicrophone` moves the node off macOS's default in/out aggregate (a 48 kHz USB
+        // interface while a 44.1 kHz Bluetooth speaker is the output): the node keeps the aggregate's 44.1 kHz.
         let hardware = input.inputFormat(forBus: 0)
-        let tapFormat: AVAudioFormat? = inputIsBluetooth && hardware.sampleRate > 0 && hardware.channelCount > 0
+        let node = input.outputFormat(forBus: 0)
+        let stale = node.sampleRate != hardware.sampleRate || node.channelCount != hardware.channelCount
+        let tapFormat: AVAudioFormat? = (inputIsBluetooth || stale) && hardware.sampleRate > 0 && hardware.channelCount > 0
             ? hardware : nil
         input.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak self] incoming, _ in
             guard let self else { return }
